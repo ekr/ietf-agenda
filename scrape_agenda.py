@@ -51,20 +51,24 @@ def process_wg(wg, agenda_name, agenda_url):
         debug(f"Fetched agenda for {wg_name}")
 
         for draft in set(drafts):
-            meta_url = f"https://datatracker.ietf.org/api/v1/doc/document/{draft}"
-            try:
-                meta_response = requests.get(meta_url, headers=headers, timeout=10)
-                meta_response.raise_for_status()
-                meta_data = meta_response.json()
-                rev = meta_data.get('rev')
-                if not rev:
-                    debug(f"Could not find revision for draft {draft}", file=sys.stderr)
+            if re.match(r'.*-\d{2}$', draft):
+                draft_with_rev = draft
+            else:
+                meta_url = f"https://datatracker.ietf.org/api/v1/doc/document/{draft}"
+                try:
+                    meta_response = requests.get(meta_url, headers=headers, timeout=10)
+                    meta_response.raise_for_status()
+                    meta_data = meta_response.json()
+                    rev = meta_data.get('rev')
+                    if not rev:
+                        debug(f"Could not find revision for draft {draft}", file=sys.stderr)
+                        continue
+                except (requests.exceptions.RequestException, requests.exceptions.JSONDecodeError) as e:
+                    debug(f"Error fetching metadata for draft {draft} from {meta_url}: {e}", file=sys.stderr)
                     continue
-            except (requests.exceptions.RequestException, requests.exceptions.JSONDecodeError) as e:
-                debug(f"Error fetching metadata for draft {draft} from {meta_url}: {e}", file=sys.stderr)
-                continue
 
-            draft_with_rev = f"{draft}-{rev}"
+                draft_with_rev = f"{draft}-{rev}"
+            
             draft_url = f"https://www.ietf.org/archive/id/{draft_with_rev}.txt"
             draft_path = os.path.join(wg_dir, f"{draft_with_rev}.txt")
 
