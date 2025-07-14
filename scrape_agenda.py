@@ -28,6 +28,7 @@ except (requests.exceptions.RequestException, requests.exceptions.JSONDecodeErro
 wg_agendas = {}
 wgs = 0
 missing_agendas = 0
+processed_wgs = set()
 
 def process_wg(wg, agenda_name, agenda_url):
     try:
@@ -49,6 +50,11 @@ for session in data.get("schedule", []):
 
     if wg_name and session.get("type") != "regular":
         continue
+
+    if wg_acronym in processed_wgs:
+        continue
+    if wg_acronym:
+        processed_wgs.add(wg_acronym)
 
     wgs += 1
     if not agenda_url:
