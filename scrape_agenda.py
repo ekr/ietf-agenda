@@ -26,6 +26,9 @@ except (requests.exceptions.RequestException, requests.exceptions.JSONDecodeErro
     sys.exit(1)
 
 wg_agendas = {}
+wgs = 0
+missing_agendas = 0
+
 for session in data.get("schedule", []):
     wg_name = session.get("groupName")
     wg_acronym = session.get("groupAcronym")
@@ -36,9 +39,11 @@ for session in data.get("schedule", []):
 
     if wg_name and session.get("type") != "regular":
         continue
-        
+
+    wgs += 1
     if not agenda_url:
         debug(f"No agenda for {wg_acronym}")
+        missing_agendas += 1
         continue
     
     if not args.no_fetch:
@@ -49,3 +54,5 @@ for session in data.get("schedule", []):
             debug(f"Fetched agenda for {wg_name}")
         except requests.exceptions.RequestException as e:
             debug(f"Error fetching agenda for {wg_name} from {agenda_url}: {e}", file=sys.stderr)
+
+print(f"Missing {missing_agendas} agendas out of {wgs} working groups ({int(float(missing_agendas)/wgs*100)}%)")
