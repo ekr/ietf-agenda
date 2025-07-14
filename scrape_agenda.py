@@ -1,12 +1,14 @@
+import argparse
 import requests
 import sys
 
-if len(sys.argv) < 2:
-    print(f"Usage: {sys.argv[0]} <meeting_number> [wg_acronym1] [wg_acronym2] ...", file=sys.stderr)
-    sys.exit(1)
+parser = argparse.ArgumentParser(description="Scrape IETF meeting agendas.")
+parser.add_argument("meeting_number", help="The IETF meeting number.")
+parser.add_argument('wg_acronyms', nargs='*', help="An optional list of WG acronyms to process.")
+args = parser.parse_args()
 
-meeting_number = sys.argv[1]
-target_wgs = set(sys.argv[2:])
+meeting_number = args.meeting_number
+target_wgs = set(args.wg_acronyms)
 URL = f"https://datatracker.ietf.org/api/meeting/{meeting_number}/agenda-data"
 
 try:
