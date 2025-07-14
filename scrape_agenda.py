@@ -1,4 +1,5 @@
 import argparse
+import os
 import re
 import requests
 import sys
@@ -19,6 +20,9 @@ target_wgs = set(args.wg_acronyms)
 URL = f"https://datatracker.ietf.org/api/meeting/{meeting_number}/agenda-data"
 headers = {"User-Agent": "ietf-agenda/0.1 (+https://github.com/ekr/ietf-agenda)"}
 
+if not args.no_fetch:
+    os.makedirs(meeting_number, exist_ok=True)
+
 try:
     response = requests.get(URL, headers=headers, timeout=10)
     response.raise_for_status()
@@ -31,17 +35,48 @@ wg_agendas = {}
 wgs = 0
 missing_agendas = 0
 processed_wgs = set()
-found_drafts = set()
 
 def process_wg(wg, agenda_name, agenda_url):
+    wg_dir = os.path.join(meeting_number, wg)
+    os.makedirs(wg_dir, exist_ok=True)
     try:
         agenda_response = requests.get(agenda_url, headers=headers, timeout=10)
         agenda_response.raise_for_status()
         agenda_text = agenda_response.text
         wg_agendas[wg_name] = agenda_text
         drafts = re.findall(r'draft-[\w-]+', agenda_text)
-        found_drafts.update(drafts)
         debug(f"Fetched agenda for {wg_name}")
+
+        for draft in set(drafts):
+            meta_url = f"https://datatracker.ietf.org/api/v1/doc/document/{draft}"
+            try:
+                meta_response = requests.get(meta_url, headers=headers, timeout=10)
+                meta_response.raise_for_status()
+                meta_data = meta_response.json()
+                rev = meta_data.get('rev')
+                if not rev:
+                    debug(f"Could not find revision for draft {draft}", file=sys.stderr)
+                    continue
+            except (requests.exceptions.RequestException, requests.exceptions.JSONDecodeError) as e:
+                debug(f"Error fetching metadata for draft {draft} from {meta_url}: {e}", file=sys.stderr)
+                continue
+
+            draft_with_rev = f"{draft}-{rev}"
+            draft_url = f"https://www.ietf.org/archive/id/{draft_with_rev}.txt"
+            draft_path = os.path.join(wg_dir, f"{draft_with_rev}.txt")
+
+            if os.path.exists(draft_path):
+                debug(f"Draft {draft_with_rev} already exists in {wg_dir}")
+                continue
+
+            try:
+                draft_response = requests.get(draft_url, headers=headers, timeout=10)
+                draft_response.raise_for_status()
+                with open(draft_path, "w") as f:
+                    f.write(draft_response.text)
+                debug(f"Downloaded {draft_with_rev} to {draft_path}")
+            except requests.exceptions.RequestException as e:
+                debug(f"Error downloading draft {draft_with_rev} from {draft_url}: {e}", file=sys.stderr)
     except requests.exceptions.RequestException as e:
         debug(f"Error fetching agenda for {wg_name} from {agenda_url}: {e}", file=sys.stderr)
 
@@ -72,8 +107,3 @@ for session in data.get("schedule", []):
         process_wg(wg_acronym, wg_name, agenda_url)
 
 print(f"Missing {missing_agendas} agendas out of {wgs} working groups ({int(float(missing_agendas)/wgs*100)}%)")
-
-if found_drafts:
-    print("\nFound drafts:")
-    for draft in sorted(list(found_drafts)):
-        print(f" - {draft}")
