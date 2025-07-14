@@ -1,4 +1,5 @@
 import argparse
+import re
 import requests
 import sys
 
@@ -16,9 +17,10 @@ def debug(*pargs, **kwargs):
 meeting_number = args.meeting_number
 target_wgs = set(args.wg_acronyms)
 URL = f"https://datatracker.ietf.org/api/meeting/{meeting_number}/agenda-data"
+headers = {"User-Agent": "ietf-agenda/0.1 (+https://github.com/ekr/ietf-agenda)"}
 
 try:
-    response = requests.get(URL, timeout=10)
+    response = requests.get(URL, headers=headers, timeout=10)
     response.raise_for_status()
     data = response.json()
 except (requests.exceptions.RequestException, requests.exceptions.JSONDecodeError) as e:
@@ -29,12 +31,16 @@ wg_agendas = {}
 wgs = 0
 missing_agendas = 0
 processed_wgs = set()
+found_drafts = set()
 
 def process_wg(wg, agenda_name, agenda_url):
     try:
-        agenda_response = requests.get(agenda_url, timeout=10)
+        agenda_response = requests.get(agenda_url, headers=headers, timeout=10)
         agenda_response.raise_for_status()
-        wg_agendas[wg_name] = agenda_response.text
+        agenda_text = agenda_response.text
+        wg_agendas[wg_name] = agenda_text
+        drafts = re.findall(r'draft-[\w-]+', agenda_text)
+        found_drafts.update(drafts)
         debug(f"Fetched agenda for {wg_name}")
     except requests.exceptions.RequestException as e:
         debug(f"Error fetching agenda for {wg_name} from {agenda_url}: {e}", file=sys.stderr)
@@ -66,3 +72,8 @@ for session in data.get("schedule", []):
         process_wg(wg_acronym, wg_name, agenda_url)
 
 print(f"Missing {missing_agendas} agendas out of {wgs} working groups ({int(float(missing_agendas)/wgs*100)}%)")
+
+if found_drafts:
+    print("\nFound drafts:")
+    for draft in sorted(list(found_drafts)):
+        print(f" - {draft}")
