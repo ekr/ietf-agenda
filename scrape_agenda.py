@@ -22,7 +22,7 @@ args = parser.parse_args()
 
 def debug(*pargs, **kwargs):
     if args.verbose:
-        print(*pargs, **kwargs)
+        print(*pargs, file=sys.stderr, **kwargs)
 
 
 meeting_number = args.meeting_number
@@ -38,12 +38,12 @@ try:
     response.raise_for_status()
     data = response.json()
 except (requests.exceptions.RequestException, requests.exceptions.JSONDecodeError) as e:
-    debug(f"Error: Could not retrieve or parse agenda data. {e}", file=sys.stderr)
+    debug(f"Error: Could not retrieve or parse agenda data. {e}")
     sys.exit(1)
 
 wg_agendas = {}
 wgs = 0
-missing_agendas = 0
+missing_agendas = set()
 processed_wgs = set()
 
 
@@ -71,8 +71,7 @@ def process_wg(wg, agenda_name, agenda_url):
                     rev = meta_data.get("rev")
                     if not rev:
                         debug(
-                            f"Could not find revision for draft {draft}",
-                            file=sys.stderr,
+                            f"Could not find revision for draft {draft}"
                         )
                         continue
                 except (
@@ -80,8 +79,7 @@ def process_wg(wg, agenda_name, agenda_url):
                     requests.exceptions.JSONDecodeError,
                 ) as e:
                     debug(
-                        f"Error fetching metadata for draft {draft} from {meta_url}: {e}",
-                        file=sys.stderr,
+                        f"Error fetching metadata for draft {draft} from {meta_url}: {e}"
                     )
                     continue
 
@@ -103,8 +101,7 @@ def process_wg(wg, agenda_name, agenda_url):
                     debug(f"Downloaded {draft_with_rev} to {draft_path}")
                 except requests.exceptions.RequestException as e:
                     debug(
-                        f"Error downloading draft {draft_with_rev} from {draft_url}: {e}",
-                        file=sys.stderr,
+                        f"Error downloading draft {draft_with_rev} from {draft_url}: {e}"
                     )
                     continue
 
@@ -129,18 +126,15 @@ def process_wg(wg, agenda_name, agenda_url):
                         debug(f"Converted {draft_path} to {pdf_path}")
                     except FileNotFoundError:
                         debug(
-                            "enscript or ps2pdf not found. Please install them to convert drafts to PDF.",
-                            file=sys.stderr,
+                            "enscript or ps2pdf not found. Please install them to convert drafts to PDF."
                         )
                     except subprocess.CalledProcessError as e:
                         debug(
-                            f"Error converting {draft_path} to PDF: {e.stderr.decode()}",
-                            file=sys.stderr,
+                            f"Error converting {draft_path} to PDF: {e.stderr.decode()}"
                         )
     except requests.exceptions.RequestException as e:
         debug(
-            f"Error fetching agenda for {wg_name} from {agenda_url}: {e}",
-            file=sys.stderr,
+            f"Error fetching agenda for {wg_name} from {agenda_url}: {e}"
         )
 
 
@@ -163,12 +157,14 @@ for session in data.get("schedule", []):
     wgs += 1
     if not agenda_url:
         debug(f"No agenda for {wg_acronym}")
-        missing_agendas += 1
+        missing_agendas.add(wg_acronym)
         continue
 
     if not args.no_fetch:
         process_wg(wg_acronym, wg_name, agenda_url)
 
-print(
-    f"Missing {missing_agendas} agendas out of {wgs} working groups ({int(float(missing_agendas)/wgs*100)}%)"
-)
+if len(missing_agendas) > 0:
+    print(
+        f"Missing {len(missing_agendas)} agendas out of {wgs} working groups ({int(float(len(missing_agendas))/wgs*100)}%)"
+    )
+    print(" ".join(missing_agendas))
