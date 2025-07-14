@@ -5,7 +5,7 @@ import requests
 import subprocess
 import sys
 
-parser = argparse.ArgumentParser(description="Scrape IETF meeting agendas.")
+parser = argparse.ArgumentParser(description="Download drafts from IETF meeting agendas.")
 parser.add_argument("meeting_number", help="The IETF meeting number.")
 parser.add_argument(
     "wg_acronyms", nargs="*", help="An optional list of WG acronyms to process."
