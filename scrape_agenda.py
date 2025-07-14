@@ -92,50 +92,51 @@ def process_wg(wg, agenda_name, agenda_url):
 
             if os.path.exists(draft_path):
                 debug(f"Draft {draft_with_rev} already exists in {wg_dir}")
-                continue
+            else:
+                try:
+                    draft_response = requests.get(
+                        draft_url, headers=headers, timeout=10
+                    )
+                    draft_response.raise_for_status()
+                    with open(draft_path, "w") as f:
+                        f.write(draft_response.text)
+                    debug(f"Downloaded {draft_with_rev} to {draft_path}")
+                except requests.exceptions.RequestException as e:
+                    debug(
+                        f"Error downloading draft {draft_with_rev} from {draft_url}: {e}",
+                        file=sys.stderr,
+                    )
+                    continue
 
-            try:
-                draft_response = requests.get(draft_url, headers=headers, timeout=10)
-                draft_response.raise_for_status()
-                with open(draft_path, "w") as f:
-                    f.write(draft_response.text)
-                debug(f"Downloaded {draft_with_rev} to {draft_path}")
-
-                if args.pdf:
-                    pdf_path = os.path.splitext(draft_path)[0] + ".pdf"
-                    if os.path.exists(pdf_path):
-                        debug(f"PDF {pdf_path} already exists.")
-                    else:
-                        try:
-                            enscript = subprocess.Popen(
-                                ["enscript", "-o", "-", draft_path],
-                                stdout=subprocess.PIPE,
-                            )
-                            ps2pdf = subprocess.run(
-                                ["ps2pdf", "-", pdf_path],
-                                stdin=enscript.stdout,
-                                check=True,
-                                capture_output=True,
-                            )
-                            enscript.stdout.close()
-                            enscript.wait()
-                            debug(f"Converted {draft_path} to {pdf_path}")
-                        except FileNotFoundError:
-                            debug(
-                                "enscript or ps2pdf not found. Please install them to convert drafts to PDF.",
-                                file=sys.stderr,
-                            )
-                        except subprocess.CalledProcessError as e:
-                            debug(
-                                f"Error converting {draft_path} to PDF: {e.stderr.decode()}",
-                                file=sys.stderr,
-                            )
-
-            except requests.exceptions.RequestException as e:
-                debug(
-                    f"Error downloading draft {draft_with_rev} from {draft_url}: {e}",
-                    file=sys.stderr,
-                )
+            if args.pdf and os.path.exists(draft_path):
+                pdf_path = os.path.splitext(draft_path)[0] + ".pdf"
+                if os.path.exists(pdf_path):
+                    debug(f"PDF {pdf_path} already exists.")
+                else:
+                    try:
+                        enscript = subprocess.Popen(
+                            ["enscript", "-o", "-", draft_path],
+                            stdout=subprocess.PIPE,
+                        )
+                        ps2pdf = subprocess.run(
+                            ["ps2pdf", "-", pdf_path],
+                            stdin=enscript.stdout,
+                            check=True,
+                            capture_output=True,
+                        )
+                        enscript.stdout.close()
+                        enscript.wait()
+                        debug(f"Converted {draft_path} to {pdf_path}")
+                    except FileNotFoundError:
+                        debug(
+                            "enscript or ps2pdf not found. Please install them to convert drafts to PDF.",
+                            file=sys.stderr,
+                        )
+                    except subprocess.CalledProcessError as e:
+                        debug(
+                            f"Error converting {draft_path} to PDF: {e.stderr.decode()}",
+                            file=sys.stderr,
+                        )
     except requests.exceptions.RequestException as e:
         debug(
             f"Error fetching agenda for {wg_name} from {agenda_url}: {e}",
