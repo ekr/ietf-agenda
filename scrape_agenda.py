@@ -5,7 +5,12 @@ import sys
 parser = argparse.ArgumentParser(description="Scrape IETF meeting agendas.")
 parser.add_argument("meeting_number", help="The IETF meeting number.")
 parser.add_argument('wg_acronyms', nargs='*', help="An optional list of WG acronyms to process.")
+parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output.")
 args = parser.parse_args()
+
+def debug(*pargs, **kwargs):
+    if args.verbose:
+        print(*pargs, **kwargs)
 
 meeting_number = args.meeting_number
 target_wgs = set(args.wg_acronyms)
@@ -16,7 +21,7 @@ try:
     response.raise_for_status()
     data = response.json()
 except (requests.exceptions.RequestException, requests.exceptions.JSONDecodeError) as e:
-    print(f"Error: Could not retrieve or parse agenda data. {e}", file=sys.stderr)
+    debug(f"Error: Could not retrieve or parse agenda data. {e}", file=sys.stderr)
     sys.exit(1)
 
 wg_agendas = {}
@@ -34,8 +39,8 @@ for session in data.get("schedule", []):
                 agenda_response = requests.get(agenda_url, timeout=10)
                 agenda_response.raise_for_status()
                 wg_agendas[wg_name] = agenda_response.text
-                print(f"Fetched agenda for {wg_name}")
+                debug(f"Fetched agenda for {wg_name}")
             except requests.exceptions.RequestException as e:
-                print(f"Error fetching agenda for {wg_name} from {agenda_url}: {e}", file=sys.stderr)
+                debug(f"Error fetching agenda for {wg_name} from {agenda_url}: {e}", file=sys.stderr)
         else:
-            print(f"No agenda for {wg_name}")
+            debug(f"No agenda for {wg_name}")
