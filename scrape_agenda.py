@@ -15,5 +15,5 @@ for session in data.get("schedule", []):
     wg_name = session.get("groupName")
     agenda_url = session.get("agenda", {}).get("url")
 
-    if wg_name:
+    if wg_name and session.get("type") == "regular":
         print(f"{wg_name}: {agenda_url or 'None'}")
