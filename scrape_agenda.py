@@ -6,6 +6,7 @@ parser = argparse.ArgumentParser(description="Scrape IETF meeting agendas.")
 parser.add_argument("meeting_number", help="The IETF meeting number.")
 parser.add_argument('wg_acronyms', nargs='*', help="An optional list of WG acronyms to process.")
 parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output.")
+parser.add_argument("--no-fetch", action="store_true", help="Do not fetch agendas.")
 args = parser.parse_args()
 
 def debug(*pargs, **kwargs):
@@ -33,14 +34,18 @@ for session in data.get("schedule", []):
     if target_wgs and wg_acronym not in target_wgs:
         continue
 
-    if wg_name and session.get("type") == "regular":
-        if agenda_url:
-            try:
-                agenda_response = requests.get(agenda_url, timeout=10)
-                agenda_response.raise_for_status()
-                wg_agendas[wg_name] = agenda_response.text
-                debug(f"Fetched agenda for {wg_name}")
-            except requests.exceptions.RequestException as e:
-                debug(f"Error fetching agenda for {wg_name} from {agenda_url}: {e}", file=sys.stderr)
-        else:
-            debug(f"No agenda for {wg_name}")
+    if wg_name and session.get("type") != "regular":
+        continue
+        
+    if not agenda_url:
+        debug(f"No agenda for {wg_acronym}")
+        continue
+    
+    if not args.no_fetch:
+        try:
+            agenda_response = requests.get(agenda_url, timeout=10)
+            agenda_response.raise_for_status()
+            wg_agendas[wg_name] = agenda_response.text
+            debug(f"Fetched agenda for {wg_name}")
+        except requests.exceptions.RequestException as e:
+            debug(f"Error fetching agenda for {wg_name} from {agenda_url}: {e}", file=sys.stderr)
