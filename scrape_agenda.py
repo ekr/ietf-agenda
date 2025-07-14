@@ -29,6 +29,16 @@ wg_agendas = {}
 wgs = 0
 missing_agendas = 0
 
+def process_wg(wg, agenda_name, agenda_url):
+    try:
+        agenda_response = requests.get(agenda_url, timeout=10)
+        agenda_response.raise_for_status()
+        wg_agendas[wg_name] = agenda_response.text
+        debug(f"Fetched agenda for {wg_name}")
+    except requests.exceptions.RequestException as e:
+        debug(f"Error fetching agenda for {wg_name} from {agenda_url}: {e}", file=sys.stderr)
+
+
 for session in data.get("schedule", []):
     wg_name = session.get("groupName")
     wg_acronym = session.get("groupAcronym")
@@ -47,12 +57,6 @@ for session in data.get("schedule", []):
         continue
     
     if not args.no_fetch:
-        try:
-            agenda_response = requests.get(agenda_url, timeout=10)
-            agenda_response.raise_for_status()
-            wg_agendas[wg_name] = agenda_response.text
-            debug(f"Fetched agenda for {wg_name}")
-        except requests.exceptions.RequestException as e:
-            debug(f"Error fetching agenda for {wg_name} from {agenda_url}: {e}", file=sys.stderr)
+        process_wg(wg_acronym, wg_name, agenda_url)
 
 print(f"Missing {missing_agendas} agendas out of {wgs} working groups ({int(float(missing_agendas)/wgs*100)}%)")
